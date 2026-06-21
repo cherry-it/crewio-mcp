@@ -19,6 +19,12 @@ const app = Fastify({
 
 app.get("/healthz", async () => ({ status: "ok", service: "crewio-mcp" }));
 
+const mcpMethodNotAllowed = {
+  jsonrpc: "2.0" as const,
+  error: { code: -32000, message: "Method not allowed." },
+  id: null,
+};
+
 // ─── MCP endpoint ─────────────────────────────────────────────────────────────
 // Handles Streamable HTTP transport (MCP spec 2024-11-05).
 // Each POST creates a stateless server instance scoped to the request's auth.
@@ -64,12 +70,38 @@ app.post("/mcp", async (request, reply) => {
     sessionIdGenerator: undefined, // stateless — no session persistence
   });
 
+  reply.hijack();
+
+  reply.raw.on("close", () => {
+    void transport.close();
+    void server.close();
+  });
+
   try {
     await server.connect(transport);
     await transport.handleRequest(request.raw, reply.raw, request.body);
-  } finally {
-    await server.close();
+  } catch (err) {
+    app.log.error(err);
+    if (!reply.raw.headersSent) {
+      reply.raw.writeHead(500, { "Content-Type": "application/json" });
+      reply.raw.end(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          error: { code: -32603, message: "Internal server error" },
+          id: null,
+        }),
+      );
+    }
   }
+});
+
+// Stateless mode — Cursor probes GET for an optional SSE stream; 405 is expected.
+app.get("/mcp", async (_request, reply) => {
+  return reply.code(405).send(mcpMethodNotAllowed);
+});
+
+app.delete("/mcp", async (_request, reply) => {
+  return reply.code(405).send(mcpMethodNotAllowed);
 });
 
 // ─── Graceful shutdown ────────────────────────────────────────────────────────
