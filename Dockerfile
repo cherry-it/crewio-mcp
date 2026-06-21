@@ -31,7 +31,7 @@ USER mcpapp
 EXPOSE 3002
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3002/healthz || exit 1
+  CMD node -e "fetch('http://127.0.0.1:3002/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # exec form — node is PID 1 and receives SIGTERM directly,
 # enabling the graceful shutdown handler in src/index.ts to run.

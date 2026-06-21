@@ -78,3 +78,5 @@ npm run build        # Compile to dist/
 docker build -t crewio-mcp .
 docker run -p 3002:3002 --env-file .env crewio-mcp
 ```
+
+Coolify: Dockerfile at repo root, expose port **3002**. Runtime env: `CREWIO_API_URL=https://api.yourapp.com` (no trailing slash).
