@@ -14,10 +14,46 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
     "list_deals",
     {
       description:
-        "List deals in the workspace. Supports optional search query, status filter (open/won/lost), and pagination.",
+        "List deals in the workspace. Supports search, filters (status, pipeline, stage, company, assignee, priority, source, value/date ranges), and pagination.",
       inputSchema: {
         q: z.string().optional().describe("Search query to filter deals by title"),
         status: z.enum(["open", "won", "lost"]).optional().describe("Filter by deal status"),
+        pipeline: z.coerce.number().int().positive().optional().describe("Filter by pipeline ID"),
+        pipeline_stage: z.coerce
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Filter by pipeline stage ID"),
+        company: z.coerce.number().int().positive().optional().describe("Filter by company ID"),
+        assignee: z.coerce
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Filter by assignee user ID"),
+        priority: z
+          .enum(["none", "low", "medium", "high", "urgent"])
+          .optional()
+          .describe("Filter by deal priority"),
+        source: z
+          .enum(["referral", "inbound", "outbound", "website", "conference", "other"])
+          .optional()
+          .describe("Filter by deal source"),
+        value_min: z.coerce.number().optional().describe("Minimum deal value (inclusive)"),
+        value_max: z.coerce.number().optional().describe("Maximum deal value (inclusive)"),
+        close_date_from: z
+          .string()
+          .optional()
+          .describe("Expected close date on or after (YYYY-MM-DD)"),
+        close_date_to: z
+          .string()
+          .optional()
+          .describe("Expected close date on or before (YYYY-MM-DD)"),
+        archived: z
+          .enum(["active", "archived", "all"])
+          .optional()
+          .describe("Filter by archived state (default: active only)"),
         page: z.coerce.number().int().positive().optional().describe("Page number (default: 1)"),
         limit: z.coerce
           .number()
@@ -28,11 +64,38 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
           .describe("Results per page (default: 25, max: 100)"),
       },
     },
-    async ({ q, status, page, limit }) => {
+    async ({
+      q,
+      status,
+      pipeline,
+      pipeline_stage,
+      company,
+      assignee,
+      priority,
+      source,
+      value_min,
+      value_max,
+      close_date_from,
+      close_date_to,
+      archived,
+      page,
+      limit,
+    }) => {
       try {
         const params: Record<string, string> = {};
         if (q) params["q"] = q;
-        if (status) params["filter[status]"] = status;
+        if (status) params["status"] = status;
+        if (pipeline) params["pipeline"] = String(pipeline);
+        if (pipeline_stage) params["pipeline_stage"] = String(pipeline_stage);
+        if (company) params["company"] = String(company);
+        if (assignee) params["assignee"] = String(assignee);
+        if (priority) params["priority"] = priority;
+        if (source) params["source"] = source;
+        if (value_min !== undefined) params["value_min"] = String(value_min);
+        if (value_max !== undefined) params["value_max"] = String(value_max);
+        if (close_date_from) params["close_date_from"] = close_date_from;
+        if (close_date_to) params["close_date_to"] = close_date_to;
+        if (archived) params["archived"] = archived;
         if (page) params["page"] = String(page);
         if (limit) params["limit"] = String(limit);
 

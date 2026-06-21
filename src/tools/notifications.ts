@@ -9,14 +9,17 @@ function apiError(err: unknown): string {
   return String(err);
 }
 
-export function registerMemberTools(server: McpServer, client: CrewioClient) {
+export function registerNotificationTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
-    "list_members",
+    "list_notifications",
     {
       description:
-        "List all members of the workspace, including their role (owner, admin, member) and user details.",
+        "List in-app notifications for the authenticated user in the current workspace. Each item includes id, read_at, created_at, and a curated message payload.",
       inputSchema: {
-        role: z.enum(["owner", "admin", "member"]).optional().describe("Filter by workspace role"),
+        status: z
+          .enum(["read", "unread"])
+          .optional()
+          .describe("Filter by read state (omit for all notifications)"),
         page: z.coerce.number().int().positive().optional().describe("Page number (default: 1)"),
         limit: z.coerce
           .number()
@@ -27,14 +30,14 @@ export function registerMemberTools(server: McpServer, client: CrewioClient) {
           .describe("Results per page (default: 25, max: 100)"),
       },
     },
-    async ({ role, page, limit }) => {
+    async ({ status, page, limit }) => {
       try {
         const params: Record<string, string> = {};
-        if (role) params["role"] = role;
+        if (status) params["status"] = status;
         if (page) params["page"] = String(page);
         if (limit) params["limit"] = String(limit);
 
-        const data = await client.members.list(params);
+        const data = await client.notifications.list(params);
         return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
       } catch (err) {
         return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
@@ -43,17 +46,33 @@ export function registerMemberTools(server: McpServer, client: CrewioClient) {
   );
 
   server.registerTool(
-    "get_member",
+    "get_unread_notification_count",
     {
       description:
-        "Get details of a single workspace member by membership ID, including their role and user profile.",
+        "Return the number of unread in-app notifications for the authenticated user in the current workspace.",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const data = await client.notifications.unreadCount();
+        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+      }
+    },
+  );
+
+  server.registerTool(
+    "mark_notification_read",
+    {
+      description: "Mark a single notification as read by notification ID.",
       inputSchema: {
-        id: z.number().int().positive().describe("Workspace membership ID"),
+        id: z.number().int().positive().describe("Notification ID"),
       },
     },
     async ({ id }) => {
       try {
-        const data = await client.members.get(id);
+        const data = await client.notifications.markRead(id);
         return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
       } catch (err) {
         return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
@@ -62,18 +81,15 @@ export function registerMemberTools(server: McpServer, client: CrewioClient) {
   );
 
   server.registerTool(
-    "update_member_role",
+    "mark_all_notifications_read",
     {
       description:
-        "Update a workspace member's role. Only 'member' and 'admin' can be assigned — ownership transfers are not supported via this tool.",
-      inputSchema: {
-        id: z.number().int().positive().describe("Workspace membership ID"),
-        role: z.enum(["member", "admin"]).describe("New role to assign (member or admin)"),
-      },
+        "Mark all unread in-app notifications as read for the authenticated user in the current workspace.",
+      inputSchema: {},
     },
-    async ({ id, role }) => {
+    async () => {
       try {
-        const data = await client.members.update(id, role);
+        const data = await client.notifications.markAllRead();
         return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
       } catch (err) {
         return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };

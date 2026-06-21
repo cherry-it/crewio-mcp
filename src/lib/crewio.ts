@@ -1,4 +1,4 @@
-import { endpoints } from "./endpoints.js";
+import { commentableCommentsPath, endpoints, type CommentableType } from "./endpoints.js";
 
 export interface AuthContext {
   token: string;
@@ -61,6 +61,10 @@ export function createCrewioClient(baseUrl: string, auth: AuthContext) {
           body: JSON.stringify({ deal: attrs }),
         });
       },
+      feedEvents(id: number, params?: Record<string, string>) {
+        const qs = params ? `?${new URLSearchParams(params)}` : "";
+        return request<unknown>(`${endpoints.deals.feedEvents(id)}${qs}`);
+      },
     },
 
     // ─── Contacts ───────────────────────────────────────────────────────────
@@ -84,6 +88,10 @@ export function createCrewioClient(baseUrl: string, auth: AuthContext) {
           method: "PATCH",
           body: JSON.stringify({ contact: attrs }),
         });
+      },
+      feedEvents(id: number, params?: Record<string, string>) {
+        const qs = params ? `?${new URLSearchParams(params)}` : "";
+        return request<unknown>(`${endpoints.contacts.feedEvents(id)}${qs}`);
       },
     },
 
@@ -109,23 +117,37 @@ export function createCrewioClient(baseUrl: string, auth: AuthContext) {
           body: JSON.stringify({ company: attrs }),
         });
       },
+      feedEvents(id: number, params?: Record<string, string>) {
+        const qs = params ? `?${new URLSearchParams(params)}` : "";
+        return request<unknown>(`${endpoints.companies.feedEvents(id)}${qs}`);
+      },
     },
 
-    // ─── Comments ───────────────────────────────────────────────────────────
+    // ─── Comments (nested under deal/contact/company) ───────────────────────
 
     comments: {
-      list(commentableType: string, commentableId: number) {
-        const qs = new URLSearchParams({
-          commentable_type: commentableType,
-          commentable_id: String(commentableId),
-        });
-        return request<unknown>(`${endpoints.comments.list}?${qs}`);
+      list(
+        commentableType: CommentableType,
+        commentableId: number,
+        params?: Record<string, string>,
+      ) {
+        const qs = params ? `?${new URLSearchParams(params)}` : "";
+        return request<unknown>(`${commentableCommentsPath(commentableType, commentableId)}${qs}`);
       },
-      create(attrs: Record<string, unknown>) {
-        return request<unknown>(endpoints.comments.create, {
+      create(commentableType: CommentableType, commentableId: number, body: string) {
+        return request<unknown>(commentableCommentsPath(commentableType, commentableId), {
           method: "POST",
-          body: JSON.stringify({ comment: attrs }),
+          body: JSON.stringify({ comment: { body } }),
         });
+      },
+    },
+
+    // ─── Activity feed ───────────────────────────────────────────────────────
+
+    feed: {
+      list(params?: Record<string, string>) {
+        const qs = params ? `?${new URLSearchParams(params)}` : "";
+        return request<unknown>(`${endpoints.feed.list}${qs}`);
       },
     },
 
@@ -223,6 +245,26 @@ export function createCrewioClient(baseUrl: string, auth: AuthContext) {
       },
     },
 
+    // ─── Workspace invitations ───────────────────────────────────────────────
+
+    invitations: {
+      list(params?: Record<string, string>) {
+        const qs = params ? `?${new URLSearchParams(params)}` : "";
+        return request<unknown>(`${endpoints.invitations.list}${qs}`);
+      },
+      create(attrs: Record<string, unknown>) {
+        return request<unknown>(endpoints.invitations.create, {
+          method: "POST",
+          body: JSON.stringify({ invitation: attrs }),
+        });
+      },
+      cancel(id: number) {
+        return request<unknown>(endpoints.invitations.cancel(id), {
+          method: "DELETE",
+        });
+      },
+    },
+
     // ─── Workspace members ───────────────────────────────────────────────────
 
     members: {
@@ -237,6 +279,28 @@ export function createCrewioClient(baseUrl: string, auth: AuthContext) {
         return request<unknown>(endpoints.members.update(id), {
           method: "PATCH",
           body: JSON.stringify({ member: { role } }),
+        });
+      },
+    },
+
+    // ─── Notifications (current user + workspace) ────────────────────────────
+
+    notifications: {
+      list(params?: Record<string, string>) {
+        const qs = params ? `?${new URLSearchParams(params)}` : "";
+        return request<unknown>(`${endpoints.notifications.list}${qs}`);
+      },
+      unreadCount() {
+        return request<unknown>(endpoints.notifications.unreadCount);
+      },
+      markRead(id: number) {
+        return request<unknown>(endpoints.notifications.markRead(id), {
+          method: "PATCH",
+        });
+      },
+      markAllRead() {
+        return request<unknown>(endpoints.notifications.markAllRead, {
+          method: "PATCH",
         });
       },
     },

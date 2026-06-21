@@ -8,6 +8,9 @@ import { registerPipelineTools } from "./tools/pipelines.js";
 import { registerTeamTools } from "./tools/teams.js";
 import { registerGroupTools } from "./tools/groups.js";
 import { registerMemberTools } from "./tools/members.js";
+import { registerInvitationTools } from "./tools/invitations.js";
+import { registerFeedTools } from "./tools/feed.js";
+import { registerNotificationTools } from "./tools/notifications.js";
 import { registerSearchTools } from "./tools/search.js";
 import { env } from "./env.js";
 
@@ -29,6 +32,9 @@ export function createMcpServer(auth: AuthContext): McpServer {
   registerTeamTools(server, client);
   registerGroupTools(server, client);
   registerMemberTools(server, client);
+  registerInvitationTools(server, client);
+  registerFeedTools(server, client);
+  registerNotificationTools(server, client);
   registerSearchTools(server, client);
 
   return server;

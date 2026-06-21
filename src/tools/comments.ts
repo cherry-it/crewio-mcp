@@ -47,9 +47,9 @@ export function registerCommentTools(server: McpServer, client: CrewioClient) {
         commentable_id: z.number().int().positive().describe("The ID of the entity to comment on"),
       },
     },
-    async (attrs) => {
+    async ({ body, commentable_type, commentable_id }) => {
       try {
-        const data = await client.comments.create(attrs as Record<string, unknown>);
+        const data = await client.comments.create(commentable_type, commentable_id, body);
         return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
       } catch (err) {
         return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };

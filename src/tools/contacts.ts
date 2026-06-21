@@ -36,7 +36,7 @@ export function registerContactTools(server: McpServer, client: CrewioClient) {
       try {
         const params: Record<string, string> = {};
         if (q) params["q"] = q;
-        if (company_id) params["filter[company]"] = String(company_id);
+        if (company_id) params["company"] = String(company_id);
         if (page) params["page"] = String(page);
         if (limit) params["limit"] = String(limit);
 
