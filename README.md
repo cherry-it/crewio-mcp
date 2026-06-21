@@ -74,9 +74,11 @@ npm run build        # Compile to dist/
 
 ## Docker
 
+The image runs with `NODE_ENV=production` (JSON logs, no `pino-pretty`). Do not override it from `.env`.
+
 ```bash
 docker build -t crewio-mcp .
-docker run -p 3002:3002 --env-file .env crewio-mcp
+docker run -p 3002:3002 -e CREWIO_API_URL=http://host.docker.internal:3000 crewio-mcp
 ```
 
 Coolify: Dockerfile at repo root, expose port **3002**. Runtime env: `CREWIO_API_URL=https://api.yourapp.com` (no trailing slash).
