@@ -16,7 +16,6 @@ RUN npm run build
 
 # ── Production image ──────────────────────────────────────────────────────────
 FROM base AS runner
-ENV NODE_ENV=production
 
 # Non-root user — never run as root in production
 RUN addgroup --system --gid 1001 nodejs \
@@ -30,9 +29,4 @@ USER mcpapp
 
 EXPOSE 3002
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3002/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-
-# exec form — node is PID 1 and receives SIGTERM directly,
-# enabling the graceful shutdown handler in src/index.ts to run.
 CMD ["node", "dist/index.js"]
