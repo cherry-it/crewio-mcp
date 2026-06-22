@@ -64,6 +64,7 @@ export function createCrewioClient(baseUrl: string, auth: AuthContext) {
         Accept: "application/json",
         Authorization: `Bearer ${auth.token}`,
         "X-Workspace-Id": auth.workspaceId,
+        "X-Source-Type": "mcp",
         ...(options.headers as Record<string, string>),
       },
     });
