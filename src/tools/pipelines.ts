@@ -28,15 +28,25 @@ export function registerPipelineTools(server: McpServer, client: CrewioClient) {
     "get_pipeline",
     {
       description:
-        "Get pipeline details with all stages and deals on the board. Optional q searches deals by title.",
+        "Get pipeline details with stages. Defaults to a lightweight response (stages only). Use include_deals=true only when you need the full kanban board; prefer include_deals=false for stage IDs.",
       inputSchema: {
         id: z.number().int().positive().describe("Pipeline ID"),
-        q: z.string().optional().describe("Search deals on the board by title"),
+        include_deals: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Include full kanban board with deals per stage (default: false)"),
+        q: z
+          .string()
+          .optional()
+          .describe("Search deals on the board by title (only when include_deals=true)"),
       },
     },
-    async ({ id, q }) => {
+    async ({ id, include_deals, q }) => {
       try {
-        const params: Record<string, string> = {};
+        const params: Record<string, string> = {
+          include_deals: include_deals ? "true" : "false",
+        };
         if (q) params["q"] = q;
         return successContent(await client.pipelines.get(id, params));
       } catch (err) {

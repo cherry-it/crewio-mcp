@@ -10,12 +10,12 @@ export function apiError(err: unknown): string {
 export function formatResult<T>(result: CrewioResult<T> | T): unknown {
   if (result !== null && typeof result === "object" && "body" in result) {
     const { body, pagination } = result as CrewioResult<T>;
-    if (pagination) {
-      return { data: body, pagination };
-    }
-    return body;
+    return pagination ? { data: body, pagination } : { data: body };
   }
-  return result;
+  if (result !== null && typeof result === "object" && "data" in result) {
+    return result;
+  }
+  return { data: result };
 }
 
 export function successContent(result: unknown) {

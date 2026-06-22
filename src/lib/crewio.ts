@@ -31,6 +31,18 @@ export class CrewioApiError extends Error {
   }
 }
 
+/** Parses API JSON, unwrapping Alba double-encoded string payloads when present. */
+export function parseApiJson(text: string): unknown {
+  const parsed: unknown = JSON.parse(text);
+  if (typeof parsed === "string") {
+    const trimmed = parsed.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      return JSON.parse(trimmed);
+    }
+  }
+  return parsed;
+}
+
 function extractPagination(res: Response): PaginationMeta | undefined {
   const currentPage = res.headers.get("current-page");
   if (!currentPage) return undefined;
@@ -57,7 +69,7 @@ export function createCrewioClient(baseUrl: string, auth: AuthContext) {
     });
 
     const text = await res.text();
-    const json: unknown = text ? JSON.parse(text) : null;
+    const json: unknown = text ? parseApiJson(text) : null;
 
     if (!res.ok) {
       throw new CrewioApiError(res.status, json);

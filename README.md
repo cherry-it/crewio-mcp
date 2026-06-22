@@ -14,6 +14,23 @@ Hosted HTTP [MCP](https://modelcontextprotocol.io) server that exposes your Crew
 
 List tools support **filters**, **sort** (`sort` + `direction`), **custom field filters**, and return **pagination metadata** from response headers (`currentPage`, `totalCount`, `totalPages`, `pageLimit`).
 
+## Response contract
+
+All tool responses use a uniform envelope:
+
+```json
+{ "data": <payload>, "pagination": { ... } }
+```
+
+- `pagination` is present only for paginated list endpoints
+- Singleton reads (`get_deal`, `get_contact`, …) return `{ "data": { ... } }`
+- Mutations that return `{ message, code }` wrap them as `{ "data": { message, code } }`
+- Raw arrays (e.g. `list_custom_field_definitions`) return `{ "data": [ ... ] }`
+
+## Future improvements
+
+See [docs/FUTURE.md](docs/FUTURE.md) for API capabilities not yet exposed as MCP tools.
+
 ## Setup
 
 ```bash

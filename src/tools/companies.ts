@@ -91,7 +91,8 @@ export function registerCompanyTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
     "create_company",
     {
-      description: "Create a new company.",
+      description:
+        "Create a new company. Call list_custom_field_definitions first to check required custom fields for this workspace.",
       inputSchema: {
         name: z.string().min(1).describe("Company name"),
         website: z.string().url().optional().describe("Website URL"),

@@ -120,7 +120,7 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
     "create_deal",
     {
       description:
-        "Create a new deal in a pipeline stage. Uses POST /pipelines/:pipeline_id/deals.",
+        "Create a new deal in a pipeline stage. Uses POST /pipelines/:pipeline_id/deals. Call list_custom_field_definitions first to check required custom fields for this workspace.",
       inputSchema: {
         pipeline_id: z.number().int().positive().describe("Pipeline ID"),
         title: z.string().min(1).describe("Deal title"),
