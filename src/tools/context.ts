@@ -186,7 +186,7 @@ export function registerContextTools(server: McpServer, client: CrewioClient) {
     "get_deal_report",
     {
       description:
-        "Run a read-only deal analytics report (pipeline_overview, deal_funnel, win_loss_analysis, etc.).",
+        "Run a read-only deal analytics report (pipeline_overview, deal_funnel, win_loss_analysis, revenue_forecast, team_performance, source_attribution, deals_at_risk, sales_cycle, conversion_rate, stage_residency).",
       inputSchema: {
         type: dealReportTypeSchema.describe("Report type"),
         date_from: z.string().optional().describe("Analysis start date (YYYY-MM-DD)"),

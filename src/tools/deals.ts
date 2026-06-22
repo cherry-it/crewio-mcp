@@ -142,7 +142,6 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
         priority: dealPrioritySchema.optional().describe("Deal priority"),
         source: dealSourceSchema.optional().describe("Deal source"),
         probability: z.number().optional().describe("Win probability (0-100)"),
-        progress: z.number().optional().describe("Deal progress percentage"),
         contact_ids: z.array(z.number().int().positive()).optional().describe("Linked contact IDs"),
         assignee_ids: z.array(z.number().int().positive()).optional().describe("Assignee user IDs"),
         custom_fields: customFieldsBodySchema,
@@ -182,7 +181,6 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
         priority: dealPrioritySchema.optional().describe("Updated deal priority"),
         source: dealSourceSchema.optional().describe("Updated deal source"),
         probability: z.number().optional().describe("Updated win probability"),
-        progress: z.number().optional().describe("Updated progress percentage"),
         contact_ids: z
           .array(z.number().int().positive())
           .optional()

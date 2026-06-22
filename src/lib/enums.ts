@@ -69,6 +69,7 @@ export const dealReportTypeSchema = z.enum([
   "deals_at_risk",
   "sales_cycle",
   "conversion_rate",
+  "stage_residency",
 ]);
 
 export const customFieldsBodySchema = z
