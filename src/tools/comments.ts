@@ -1,13 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { type CrewioClient, CrewioApiError } from "../lib/crewio.js";
-
-function apiError(err: unknown): string {
-  if (err instanceof CrewioApiError) {
-    return `API error ${err.status}: ${JSON.stringify(err.body)}`;
-  }
-  return String(err);
-}
+import type { CrewioClient } from "../lib/crewio.js";
+import { commentableTypeSchema } from "../lib/enums.js";
+import { paginationSchema } from "../lib/query-params.js";
+import { errorContent, successContent } from "../lib/tool-helpers.js";
 
 export function registerCommentTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
@@ -15,22 +11,19 @@ export function registerCommentTools(server: McpServer, client: CrewioClient) {
     {
       description: "List comments for a deal, contact, or company.",
       inputSchema: {
-        commentable_type: z
-          .enum(["Deal", "Contact", "Company"])
-          .describe("The type of the entity to fetch comments for"),
-        commentable_id: z
-          .number()
-          .int()
-          .positive()
-          .describe("The ID of the entity to fetch comments for"),
+        commentable_type: commentableTypeSchema.describe("Entity type"),
+        commentable_id: z.number().int().positive().describe("Entity ID"),
+        ...paginationSchema,
       },
     },
-    async ({ commentable_type, commentable_id }) => {
+    async ({ commentable_type, commentable_id, page, limit }) => {
       try {
-        const data = await client.comments.list(commentable_type, commentable_id);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        const params: Record<string, string> = {};
+        if (page) params["page"] = String(page);
+        if (limit) params["limit"] = String(limit);
+        return successContent(await client.comments.list(commentable_type, commentable_id, params));
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
       }
     },
   );
@@ -41,18 +34,78 @@ export function registerCommentTools(server: McpServer, client: CrewioClient) {
       description: "Post a comment on a deal, contact, or company.",
       inputSchema: {
         body: z.string().min(1).describe("Comment text"),
-        commentable_type: z
-          .enum(["Deal", "Contact", "Company"])
-          .describe("The type of the entity to comment on"),
-        commentable_id: z.number().int().positive().describe("The ID of the entity to comment on"),
+        commentable_type: commentableTypeSchema.describe("Entity type"),
+        commentable_id: z.number().int().positive().describe("Entity ID"),
       },
     },
     async ({ body, commentable_type, commentable_id }) => {
       try {
-        const data = await client.comments.create(commentable_type, commentable_id, body);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        return successContent(await client.comments.create(commentable_type, commentable_id, body));
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "update_comment",
+    {
+      description: "Update a comment body.",
+      inputSchema: {
+        id: z.number().int().positive().describe("Comment ID"),
+        body: z.string().min(1).describe("Updated comment text"),
+      },
+    },
+    async ({ id, body }) => {
+      try {
+        return successContent(await client.comments.update(id, body));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "delete_comment",
+    {
+      description: "Permanently delete a comment.",
+      inputSchema: { id: z.number().int().positive().describe("Comment ID") },
+    },
+    async ({ id }) => {
+      try {
+        return successContent(await client.comments.destroy(id));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "discard_comment",
+    {
+      description: "Archive (soft delete) a comment.",
+      inputSchema: { id: z.number().int().positive().describe("Comment ID") },
+    },
+    async ({ id }) => {
+      try {
+        return successContent(await client.comments.discard(id));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "restore_comment",
+    {
+      description: "Restore an archived comment.",
+      inputSchema: { id: z.number().int().positive().describe("Comment ID") },
+    },
+    async ({ id }) => {
+      try {
+        return successContent(await client.comments.restore(id));
+      } catch (err) {
+        return errorContent(err);
       }
     },
   );

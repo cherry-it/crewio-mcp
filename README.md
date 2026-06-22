@@ -2,25 +2,17 @@
 
 Hosted HTTP [MCP](https://modelcontextprotocol.io) server that exposes your Crewio CRM as tools for AI assistants (Cursor, Claude Desktop, etc.).
 
-## Tools
+## Capabilities
 
-| Tool             | Description                                                    |
-| ---------------- | -------------------------------------------------------------- |
-| `list_deals`     | List deals with optional search, status filter, and pagination |
-| `get_deal`       | Get full deal details by ID                                    |
-| `create_deal`    | Create a new deal                                              |
-| `update_deal`    | Update an existing deal                                        |
-| `list_contacts`  | List contacts with optional search and pagination              |
-| `get_contact`    | Get full contact details by ID                                 |
-| `create_contact` | Create a new contact                                           |
-| `update_contact` | Update an existing contact                                     |
-| `list_companies` | List companies with optional search and pagination             |
-| `get_company`    | Get full company details by ID                                 |
-| `create_company` | Create a new company                                           |
-| `update_company` | Update an existing company                                     |
-| `list_comments`  | List comments on a deal, contact, or company                   |
-| `create_comment` | Post a comment on a deal, contact, or company                  |
-| `search`         | Full-text search across deals, contacts, and companies         |
+- **CRM core**: deals, contacts, companies — full CRUD, archive/restore, bulk actions, custom fields
+- **Pipelines**: pipelines and stages CRUD, board view, deal creation via `POST /pipelines/:id/deals`
+- **Relationships**: contact ↔ company links, comments, activity feed
+- **Workspace**: members, teams, groups, invitations, notifications
+- **Discovery**: `list_custom_field_definitions`, omnibox `search`, MCP resource `crewio://schema/collection-filters`
+- **Analytics**: deal reports, calendar, recycle bin
+- **Context**: `get_me`, `list_workspaces`
+
+List tools support **filters**, **sort** (`sort` + `direction`), **custom field filters**, and return **pagination metadata** from response headers (`currentPage`, `totalCount`, `totalPages`, `pageLimit`).
 
 ## Setup
 
@@ -49,16 +41,18 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 }
 ```
 
-The server is **stateless** — each request is authenticated independently via the `Authorization` and `X-Workspace-Id` headers, so multiple users can share a single hosted instance with their own tokens.
+The server is **stateless** — each request is authenticated independently via the `Authorization` and `X-Workspace-Id` headers.
 
 ## Authentication
 
-Requests must include two headers:
+Requests must include:
 
 - `Authorization: Bearer <token>` — your Crewio API token
 - `X-Workspace-Id: <id>` — your workspace ID
 
-These are forwarded as-is to the Crewio backend on every tool call.
+## MCP resource
+
+Read `crewio://schema/collection-filters` for filter allowlists, sort fields, and enum values per collection endpoint.
 
 ## Development
 
@@ -68,17 +62,14 @@ npm run typecheck    # TypeScript type check
 npm run lint         # oxlint
 npm run lint:fix     # oxlint --fix
 npm run format       # oxfmt
-npm run format:check # oxfmt --check
 npm run build        # Compile to dist/
 ```
 
 ## Docker
-
-The image runs with `NODE_ENV=production` (JSON logs, no `pino-pretty`). Do not override it from `.env`.
 
 ```bash
 docker build -t crewio-mcp .
 docker run -p 3002:3002 -e CREWIO_API_URL=http://host.docker.internal:3000 crewio-mcp
 ```
 
-Coolify: Dockerfile at repo root, expose port **3002**. Runtime env: `CREWIO_API_URL=https://api.yourapp.com` (no trailing slash).
+Coolify: expose port **3002**. Runtime env: `CREWIO_API_URL=https://api.yourapp.com` (no trailing slash).

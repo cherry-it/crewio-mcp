@@ -1,30 +1,23 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { type CrewioClient, CrewioApiError } from "../lib/crewio.js";
-
-function apiError(err: unknown): string {
-  if (err instanceof CrewioApiError) {
-    return `API error ${err.status}: ${JSON.stringify(err.body)}`;
-  }
-  return String(err);
-}
+import type { CrewioClient } from "../lib/crewio.js";
+import { errorContent, successContent } from "../lib/tool-helpers.js";
 
 export function registerSearchTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
     "search",
     {
       description:
-        "Search across all entities in the workspace (deals, contacts, companies) using a single query string.",
+        "Omnibox search across deals, contacts, companies, teams, groups, and members. Returns top 5 per type plus total counts.",
       inputSchema: {
-        q: z.string().min(1).describe("Search query"),
+        q: z.string().min(2).max(100).describe("Search query (2-100 characters)"),
       },
     },
     async ({ q }) => {
       try {
-        const data = await client.search(q);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        return successContent(await client.search(q));
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
       }
     },
   );

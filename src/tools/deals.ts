@@ -1,12 +1,29 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { type CrewioClient, CrewioApiError } from "../lib/crewio.js";
+import type { CrewioClient } from "../lib/crewio.js";
+import {
+  customFieldsBodySchema,
+  dealPrioritySchema,
+  dealSourceSchema,
+  dealStatusSchema,
+} from "../lib/enums.js";
+import {
+  archivedFilterSchema,
+  buildListQueryParams,
+  customFieldFilterSchema,
+  paginationSchema,
+  sortSchema,
+} from "../lib/query-params.js";
+import { errorContent, successContent } from "../lib/tool-helpers.js";
 
-function apiError(err: unknown): string {
-  if (err instanceof CrewioApiError) {
-    return `API error ${err.status}: ${JSON.stringify(err.body)}`;
+function attrsWithCustomFields(
+  attrs: Record<string, unknown>,
+  customFields?: Record<string, string>,
+): Record<string, unknown> {
+  if (customFields && Object.keys(customFields).length > 0) {
+    attrs["custom_fields"] = customFields;
   }
-  return String(err);
+  return attrs;
 }
 
 export function registerDealTools(server: McpServer, client: CrewioClient) {
@@ -14,10 +31,10 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
     "list_deals",
     {
       description:
-        "List deals in the workspace. Supports search, filters (status, pipeline, stage, company, assignee, priority, source, value/date ranges), and pagination.",
+        "List deals in the workspace. Supports search, filters, sort, custom field filters, and pagination.",
       inputSchema: {
         q: z.string().optional().describe("Search query to filter deals by title"),
-        status: z.enum(["open", "won", "lost"]).optional().describe("Filter by deal status"),
+        status: dealStatusSchema.optional().describe("Filter by deal status"),
         pipeline: z.coerce.number().int().positive().optional().describe("Filter by pipeline ID"),
         pipeline_stage: z.coerce
           .number()
@@ -32,14 +49,8 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
           .positive()
           .optional()
           .describe("Filter by assignee user ID"),
-        priority: z
-          .enum(["none", "low", "medium", "high", "urgent"])
-          .optional()
-          .describe("Filter by deal priority"),
-        source: z
-          .enum(["referral", "inbound", "outbound", "website", "conference", "other"])
-          .optional()
-          .describe("Filter by deal source"),
+        priority: dealPrioritySchema.optional().describe("Filter by deal priority"),
+        source: dealSourceSchema.optional().describe("Filter by deal source"),
         value_min: z.coerce.number().optional().describe("Minimum deal value (inclusive)"),
         value_max: z.coerce.number().optional().describe("Maximum deal value (inclusive)"),
         close_date_from: z
@@ -50,59 +61,39 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
           .string()
           .optional()
           .describe("Expected close date on or before (YYYY-MM-DD)"),
-        archived: z
-          .enum(["active", "archived", "all"])
-          .optional()
-          .describe("Filter by archived state (default: active only)"),
-        page: z.coerce.number().int().positive().optional().describe("Page number (default: 1)"),
-        limit: z.coerce
-          .number()
-          .int()
-          .positive()
-          .max(100)
-          .optional()
-          .describe("Results per page (default: 25, max: 100)"),
+        archived: archivedFilterSchema,
+        custom_fields: customFieldFilterSchema,
+        ...sortSchema,
+        ...paginationSchema,
       },
     },
-    async ({
-      q,
-      status,
-      pipeline,
-      pipeline_stage,
-      company,
-      assignee,
-      priority,
-      source,
-      value_min,
-      value_max,
-      close_date_from,
-      close_date_to,
-      archived,
-      page,
-      limit,
-    }) => {
+    async (input) => {
       try {
-        const params: Record<string, string> = {};
-        if (q) params["q"] = q;
-        if (status) params["status"] = status;
-        if (pipeline) params["pipeline"] = String(pipeline);
-        if (pipeline_stage) params["pipeline_stage"] = String(pipeline_stage);
-        if (company) params["company"] = String(company);
-        if (assignee) params["assignee"] = String(assignee);
-        if (priority) params["priority"] = priority;
-        if (source) params["source"] = source;
-        if (value_min !== undefined) params["value_min"] = String(value_min);
-        if (value_max !== undefined) params["value_max"] = String(value_max);
-        if (close_date_from) params["close_date_from"] = close_date_from;
-        if (close_date_to) params["close_date_to"] = close_date_to;
-        if (archived) params["archived"] = archived;
-        if (page) params["page"] = String(page);
-        if (limit) params["limit"] = String(limit);
-
-        const data = await client.deals.list(params);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        const params = buildListQueryParams({
+          page: input.page,
+          limit: input.limit,
+          sort: input.sort,
+          direction: input.direction,
+          customFields: input.custom_fields,
+          extra: {
+            q: input.q,
+            status: input.status,
+            pipeline: input.pipeline ? String(input.pipeline) : undefined,
+            pipeline_stage: input.pipeline_stage ? String(input.pipeline_stage) : undefined,
+            company: input.company ? String(input.company) : undefined,
+            assignee: input.assignee ? String(input.assignee) : undefined,
+            priority: input.priority,
+            source: input.source,
+            value_min: input.value_min !== undefined ? String(input.value_min) : undefined,
+            value_max: input.value_max !== undefined ? String(input.value_max) : undefined,
+            close_date_from: input.close_date_from,
+            close_date_to: input.close_date_to,
+            archived: input.archived,
+          },
+        });
+        return successContent(await client.deals.list(params));
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
       }
     },
   );
@@ -111,17 +102,16 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
     "get_deal",
     {
       description:
-        "Get full details of a single deal by ID, including pipeline stage, contacts, company, assignees, and activity feed.",
+        "Get full details of a single deal by ID, including pipeline stage, contacts, company, assignees, and custom fields.",
       inputSchema: {
         id: z.number().int().positive().describe("Deal ID"),
       },
     },
     async ({ id }) => {
       try {
-        const data = await client.deals.get(id);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        return successContent(await client.deals.get(id));
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
       }
     },
   );
@@ -129,8 +119,10 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
     "create_deal",
     {
-      description: "Create a new deal in the workspace.",
+      description:
+        "Create a new deal in a pipeline stage. Uses POST /pipelines/:pipeline_id/deals.",
       inputSchema: {
+        pipeline_id: z.number().int().positive().describe("Pipeline ID"),
         title: z.string().min(1).describe("Deal title"),
         pipeline_stage_id: z
           .number()
@@ -143,22 +135,26 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
           .length(3)
           .optional()
           .describe("ISO 4217 currency code (e.g. USD, EUR)"),
-        status: z.enum(["open", "won", "lost"]).optional().describe("Deal status (default: open)"),
+        status: dealStatusSchema.optional().describe("Deal status (default: open)"),
         company_id: z.number().int().positive().optional().describe("Associated company ID"),
         description: z.string().optional().describe("Deal description or notes"),
-        expected_close_date: z
-          .string()
-          .optional()
-          .describe("Expected close date in ISO 8601 format (YYYY-MM-DD)"),
-        priority: z.enum(["low", "medium", "high"]).optional().describe("Deal priority"),
+        expected_close_date: z.string().optional().describe("Expected close date (YYYY-MM-DD)"),
+        priority: dealPrioritySchema.optional().describe("Deal priority"),
+        source: dealSourceSchema.optional().describe("Deal source"),
+        probability: z.number().optional().describe("Win probability (0-100)"),
+        progress: z.number().optional().describe("Deal progress percentage"),
+        contact_ids: z.array(z.number().int().positive()).optional().describe("Linked contact IDs"),
+        assignee_ids: z.array(z.number().int().positive()).optional().describe("Assignee user IDs"),
+        custom_fields: customFieldsBodySchema,
       },
     },
-    async (attrs) => {
+    async ({ pipeline_id, custom_fields, ...attrs }) => {
       try {
-        const data = await client.deals.create(attrs as Record<string, unknown>);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        return successContent(
+          await client.deals.create(pipeline_id, attrsWithCustomFields(attrs, custom_fields)),
+        );
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
       }
     },
   );
@@ -166,12 +162,13 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
     "update_deal",
     {
-      description: "Update an existing deal's fields.",
+      description: "Update an existing deal's fields, contacts, assignees, or custom fields.",
       inputSchema: {
         id: z.number().int().positive().describe("Deal ID"),
         title: z.string().optional().describe("New deal title"),
         value: z.number().optional().describe("Updated deal value"),
-        status: z.enum(["open", "won", "lost"]).optional().describe("Updated deal status"),
+        currency: z.string().length(3).optional().describe("Updated currency code"),
+        status: dealStatusSchema.optional().describe("Updated deal status"),
         lost_reason: z
           .string()
           .optional()
@@ -182,15 +179,172 @@ export function registerDealTools(server: McpServer, client: CrewioClient) {
           .string()
           .optional()
           .describe("Updated expected close date (YYYY-MM-DD)"),
-        priority: z.enum(["low", "medium", "high"]).optional().describe("Updated deal priority"),
+        priority: dealPrioritySchema.optional().describe("Updated deal priority"),
+        source: dealSourceSchema.optional().describe("Updated deal source"),
+        probability: z.number().optional().describe("Updated win probability"),
+        progress: z.number().optional().describe("Updated progress percentage"),
+        contact_ids: z
+          .array(z.number().int().positive())
+          .optional()
+          .describe("Replace linked contacts"),
+        assignee_ids: z.array(z.number().int().positive()).optional().describe("Replace assignees"),
+        custom_fields: customFieldsBodySchema,
       },
     },
-    async ({ id, ...attrs }) => {
+    async ({ id, custom_fields, ...attrs }) => {
       try {
-        const data = await client.deals.update(id, attrs as Record<string, unknown>);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        return successContent(
+          await client.deals.update(id, attrsWithCustomFields(attrs, custom_fields)),
+        );
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "move_deal",
+    {
+      description:
+        "Move a deal to another pipeline stage and position (kanban reorder). Cannot move across pipelines on this endpoint.",
+      inputSchema: {
+        id: z.number().int().positive().describe("Deal ID"),
+        pipeline_stage_id: z.number().int().positive().describe("Target pipeline stage ID"),
+        position: z
+          .number()
+          .int()
+          .positive()
+          .describe("Target position within the stage (1-based)"),
+        lost_reason: z.string().optional().describe("Required when moving to a lost stage"),
+      },
+    },
+    async ({ id, pipeline_stage_id, position, lost_reason }) => {
+      try {
+        const attrs: Record<string, unknown> = {
+          pipeline_stage_id,
+          position,
+        };
+        if (lost_reason) attrs["lost_reason"] = lost_reason;
+        return successContent(await client.deals.move(id, attrs));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "discard_deal",
+    {
+      description: "Archive (soft delete) a deal.",
+      inputSchema: { id: z.number().int().positive().describe("Deal ID") },
+    },
+    async ({ id }) => {
+      try {
+        return successContent(await client.deals.discard(id));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "restore_deal",
+    {
+      description: "Restore an archived deal from the recycle bin.",
+      inputSchema: { id: z.number().int().positive().describe("Deal ID") },
+    },
+    async ({ id }) => {
+      try {
+        return successContent(await client.deals.restore(id));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "delete_deal",
+    {
+      description: "Permanently delete a deal.",
+      inputSchema: { id: z.number().int().positive().describe("Deal ID") },
+    },
+    async ({ id }) => {
+      try {
+        return successContent(await client.deals.destroy(id));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "bulk_discard_deals",
+    {
+      description: "Archive multiple deals by ID.",
+      inputSchema: {
+        ids: z.array(z.number().int().positive()).min(1).describe("Deal IDs to archive"),
+      },
+    },
+    async ({ ids }) => {
+      try {
+        return successContent(await client.deals.bulkDiscard(ids));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "bulk_delete_deals",
+    {
+      description: "Permanently delete multiple deals by ID.",
+      inputSchema: {
+        ids: z.array(z.number().int().positive()).min(1).describe("Deal IDs to delete"),
+      },
+    },
+    async ({ ids }) => {
+      try {
+        return successContent(await client.deals.bulkDestroy(ids));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "bulk_move_deals",
+    {
+      description: "Move multiple deals to a pipeline stage (appended at end of stage).",
+      inputSchema: {
+        ids: z.array(z.number().int().positive()).min(1).describe("Deal IDs to move"),
+        pipeline_stage_id: z.number().int().positive().describe("Target pipeline stage ID"),
+        lost_reason: z.string().optional().describe("Required when target stage is a lost stage"),
+      },
+    },
+    async ({ ids, pipeline_stage_id, lost_reason }) => {
+      try {
+        return successContent(await client.deals.bulkMove(pipeline_stage_id, ids, lost_reason));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "bulk_update_deal_status",
+    {
+      description: "Update status for multiple deals (e.g. mark as won or lost).",
+      inputSchema: {
+        ids: z.array(z.number().int().positive()).min(1).describe("Deal IDs"),
+        status: dealStatusSchema.describe("New status for all deals"),
+        lost_reason: z.string().optional().describe("Required when status is 'lost'"),
+      },
+    },
+    async ({ ids, status, lost_reason }) => {
+      try {
+        return successContent(await client.deals.bulkUpdateStatus(status, ids, lost_reason));
+      } catch (err) {
+        return errorContent(err);
       }
     },
   );

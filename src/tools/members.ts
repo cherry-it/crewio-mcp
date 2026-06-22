@@ -1,43 +1,32 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { type CrewioClient, CrewioApiError } from "../lib/crewio.js";
-
-function apiError(err: unknown): string {
-  if (err instanceof CrewioApiError) {
-    return `API error ${err.status}: ${JSON.stringify(err.body)}`;
-  }
-  return String(err);
-}
+import type { CrewioClient } from "../lib/crewio.js";
+import { buildListQueryParams, paginationSchema, sortSchema } from "../lib/query-params.js";
+import { errorContent, successContent } from "../lib/tool-helpers.js";
 
 export function registerMemberTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
     "list_members",
     {
-      description:
-        "List all members of the workspace, including their role (owner, admin, member) and user details.",
+      description: "List workspace members with optional role filter, sort, and pagination.",
       inputSchema: {
         role: z.enum(["owner", "admin", "member"]).optional().describe("Filter by workspace role"),
-        page: z.coerce.number().int().positive().optional().describe("Page number (default: 1)"),
-        limit: z.coerce
-          .number()
-          .int()
-          .positive()
-          .max(100)
-          .optional()
-          .describe("Results per page (default: 25, max: 100)"),
+        ...sortSchema,
+        ...paginationSchema,
       },
     },
-    async ({ role, page, limit }) => {
+    async (input) => {
       try {
-        const params: Record<string, string> = {};
-        if (role) params["role"] = role;
-        if (page) params["page"] = String(page);
-        if (limit) params["limit"] = String(limit);
-
-        const data = await client.members.list(params);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        const params = buildListQueryParams({
+          page: input.page,
+          limit: input.limit,
+          sort: input.sort,
+          direction: input.direction,
+          extra: { role: input.role },
+        });
+        return successContent(await client.members.list(params));
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
       }
     },
   );
@@ -45,18 +34,16 @@ export function registerMemberTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
     "get_member",
     {
-      description:
-        "Get details of a single workspace member by membership ID, including their role and user profile.",
+      description: "Get a workspace member by membership ID.",
       inputSchema: {
         id: z.number().int().positive().describe("Workspace membership ID"),
       },
     },
     async ({ id }) => {
       try {
-        const data = await client.members.get(id);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        return successContent(await client.members.get(id));
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
       }
     },
   );
@@ -64,19 +51,17 @@ export function registerMemberTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
     "update_member_role",
     {
-      description:
-        "Update a workspace member's role. Only 'member' and 'admin' can be assigned — ownership transfers are not supported via this tool.",
+      description: "Update a member's role (member or admin only).",
       inputSchema: {
         id: z.number().int().positive().describe("Workspace membership ID"),
-        role: z.enum(["member", "admin"]).describe("New role to assign (member or admin)"),
+        role: z.enum(["member", "admin"]).describe("New role"),
       },
     },
     async ({ id, role }) => {
       try {
-        const data = await client.members.update(id, role);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        return successContent(await client.members.update(id, role));
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
       }
     },
   );

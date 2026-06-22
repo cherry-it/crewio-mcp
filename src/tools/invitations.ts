@@ -1,28 +1,19 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { type CrewioClient, CrewioApiError } from "../lib/crewio.js";
-
-function apiError(err: unknown): string {
-  if (err instanceof CrewioApiError) {
-    return `API error ${err.status}: ${JSON.stringify(err.body)}`;
-  }
-  return String(err);
-}
+import type { CrewioClient } from "../lib/crewio.js";
+import { buildListQueryParams, paginationSchema } from "../lib/query-params.js";
+import { errorContent, successContent } from "../lib/tool-helpers.js";
 
 export function registerInvitationTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
     "create_invitation",
     {
-      description:
-        "Invite a user to the workspace by email. Sends an invitation email; the invitee must accept to join. Role defaults to member if omitted.",
+      description: "Invite a user to the workspace by email.",
       inputSchema: {
         email: z.string().email().describe("Email address to invite"),
-        role: z
-          .enum(["member", "admin"])
-          .optional()
-          .describe("Workspace role for the invitee (default: member)"),
-        first_name: z.string().optional().describe("Invitee first name (optional)"),
-        last_name: z.string().optional().describe("Invitee last name (optional)"),
+        role: z.enum(["member", "admin"]).optional().describe("Role (default: member)"),
+        first_name: z.string().optional().describe("Invitee first name"),
+        last_name: z.string().optional().describe("Invitee last name"),
       },
     },
     async ({ email, role, first_name, last_name }) => {
@@ -31,11 +22,9 @@ export function registerInvitationTools(server: McpServer, client: CrewioClient)
         if (role) attrs["role"] = role;
         if (first_name) attrs["first_name"] = first_name;
         if (last_name) attrs["last_name"] = last_name;
-
-        const data = await client.invitations.create(attrs);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        return successContent(await client.invitations.create(attrs));
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
       }
     },
   );
@@ -43,31 +32,22 @@ export function registerInvitationTools(server: McpServer, client: CrewioClient)
   server.registerTool(
     "list_invitations",
     {
-      description:
-        "List pending workspace invitations. Returns email, role, expiry, and who sent each invite.",
+      description: "List pending workspace invitations.",
       inputSchema: {
         role: z.enum(["member", "admin"]).optional().describe("Filter by invitation role"),
-        page: z.coerce.number().int().positive().optional().describe("Page number (default: 1)"),
-        limit: z.coerce
-          .number()
-          .int()
-          .positive()
-          .max(100)
-          .optional()
-          .describe("Results per page (default: 25, max: 100)"),
+        ...paginationSchema,
       },
     },
-    async ({ role, page, limit }) => {
+    async (input) => {
       try {
-        const params: Record<string, string> = {};
-        if (role) params["role"] = role;
-        if (page) params["page"] = String(page);
-        if (limit) params["limit"] = String(limit);
-
-        const data = await client.invitations.list(params);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        const params = buildListQueryParams({
+          page: input.page,
+          limit: input.limit,
+          extra: { role: input.role },
+        });
+        return successContent(await client.invitations.list(params));
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
       }
     },
   );
@@ -75,17 +55,14 @@ export function registerInvitationTools(server: McpServer, client: CrewioClient)
   server.registerTool(
     "cancel_invitation",
     {
-      description: "Cancel a pending workspace invitation by invitation ID.",
-      inputSchema: {
-        id: z.number().int().positive().describe("Invitation ID"),
-      },
+      description: "Cancel a pending invitation.",
+      inputSchema: { id: z.number().int().positive().describe("Invitation ID") },
     },
     async ({ id }) => {
       try {
-        const data = await client.invitations.cancel(id);
-        return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        return successContent(await client.invitations.cancel(id));
       } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${apiError(err)}` }], isError: true };
+        return errorContent(err);
       }
     },
   );
