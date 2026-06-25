@@ -42,7 +42,11 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
     const thread = [...existingThread, { role: "user" as const, content: message }];
 
     try {
-      const { finalOutput, newThread } = await runAgent({ auth: authResult.auth, thread });
+      const { finalOutput, newThread } = await runAgent({
+        auth: authResult.auth,
+        thread,
+        sessionId: session_id,
+      });
       sessionStore.set(session_id, newThread);
       return reply.code(200).send({ session_id, reply: finalOutput });
     } catch (err) {

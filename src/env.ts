@@ -10,6 +10,11 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
   AGENT_MODEL: z.string().default("gpt-4.1"),
   AGENT_MAX_TURNS: z.coerce.number().int().positive().default(10),
+
+  // Langfuse tracing (optional). Tracing is enabled only when both keys are set.
+  LANGFUSE_PUBLIC_KEY: z.string().optional(),
+  LANGFUSE_SECRET_KEY: z.string().optional(),
+  LANGFUSE_BASE_URL: z.string().url().default("https://cloud.langfuse.com"),
 });
 
 function parseEnv() {

@@ -1,4 +1,4 @@
-import "./env.js"; // Validate env on startup
+import { langfuseSpanProcessor } from "./observability/instrumentation.js"; // Init tracing first
 
 import Fastify from "fastify";
 import { env } from "./env.js";
@@ -27,6 +27,13 @@ async function shutdown(): Promise<void> {
   app.log.info("Shutting down…");
   sessionStore.destroy();
   await app.close();
+  if (langfuseSpanProcessor) {
+    try {
+      await langfuseSpanProcessor.forceFlush();
+    } catch (err) {
+      app.log.error(err, "failed to flush Langfuse traces");
+    }
+  }
   app.log.info("Shutdown complete.");
   process.exit(0);
 }
