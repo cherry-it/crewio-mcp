@@ -2,9 +2,33 @@ import type { AgentInputItem } from "@openai/agents";
 
 const IDLE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
+// Cap how many user turns of history we replay to the model. Each agent run
+// re-sends the whole thread (instructions + tool schemas + every prior tool
+// output) once per turn, so unbounded history quickly burns the token budget.
+const MAX_HISTORY_USER_TURNS = 8;
+
 interface Session {
   thread: AgentInputItem[];
   lastAccessedAt: number;
+}
+
+function isUserMessage(item: AgentInputItem): boolean {
+  return "role" in item && item.role === "user";
+}
+
+/**
+ * Keeps only the most recent `MAX_HISTORY_USER_TURNS` user turns. Trimming always
+ * starts at a user-message boundary so function_call/function_call_result pairs
+ * stay intact and the thread never begins with an orphaned tool output.
+ */
+function trimThread(thread: AgentInputItem[]): AgentInputItem[] {
+  const userTurnStarts: number[] = [];
+  for (let i = 0; i < thread.length; i++) {
+    if (isUserMessage(thread[i])) userTurnStarts.push(i);
+  }
+  if (userTurnStarts.length <= MAX_HISTORY_USER_TURNS) return thread;
+  const start = userTurnStarts[userTurnStarts.length - MAX_HISTORY_USER_TURNS];
+  return thread.slice(start);
 }
 
 /**
@@ -30,7 +54,7 @@ class SessionStore {
   }
 
   set(sessionId: string, thread: AgentInputItem[]): void {
-    this.sessions.set(sessionId, { thread, lastAccessedAt: Date.now() });
+    this.sessions.set(sessionId, { thread: trimThread(thread), lastAccessedAt: Date.now() });
   }
 
   delete(sessionId: string): void {

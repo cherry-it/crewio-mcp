@@ -8,6 +8,7 @@ import { actionsForResource, getAction, globalActions, listActions } from "./act
 import {
   getResourceDefinition,
   listResourceSlugs,
+  resourceEnums,
   supportedOperations,
 } from "./resource-registry.js";
 
@@ -126,13 +127,14 @@ const describeResource = tool({
       });
     }
 
+    const enums = resourceEnums(def);
     return JSON.stringify({
       resource: def.slug,
       description: def.description,
       operations: supportedOperations(def),
       schema: def.schema ?? null,
       common: COLLECTION_SCHEMA_CATALOG.common,
-      enums: COLLECTION_SCHEMA_CATALOG.enums,
+      ...(enums ? { enums } : {}),
       actions: actionSummary(def.slug),
     });
   },

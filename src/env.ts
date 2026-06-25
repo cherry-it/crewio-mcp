@@ -9,7 +9,7 @@ const envSchema = z.object({
   // OpenAI agent config
   OPENAI_API_KEY: z.string().min(1),
   AGENT_MODEL: z.string().default("gpt-4.1"),
-  AGENT_MAX_TURNS: z.coerce.number().int().positive().default(20),
+  AGENT_MAX_TURNS: z.coerce.number().int().positive().default(10),
 });
 
 function parseEnv() {

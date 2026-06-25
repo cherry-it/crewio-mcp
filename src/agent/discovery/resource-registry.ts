@@ -4,6 +4,8 @@ import { COLLECTION_SCHEMA_CATALOG } from "../../lib/schema-catalog.js";
 export type ListParams = Record<string, string>;
 export type Attributes = Record<string, unknown>;
 
+type EnumKey = keyof typeof COLLECTION_SCHEMA_CATALOG.enums;
+
 export type ResourceOperation =
   | "query"
   | "get"
@@ -28,6 +30,8 @@ export interface ResourceDefinition {
   description: string;
   /** Catalog entry (filters/sort/enums) when one exists for this resource. */
   schema?: unknown;
+  /** Enum catalogs relevant to this resource, surfaced by describe_resource. */
+  enumKeys?: EnumKey[];
   ops: ResourceOps;
 }
 
@@ -45,6 +49,7 @@ const definitions: ResourceDefinition[] = [
     description:
       "Sales deal in a pipeline stage. Create requires pipeline_id and pipeline_stage_id.",
     schema: COLLECTION_SCHEMA_CATALOG.deals,
+    enumKeys: ["dealStatus", "dealPriority", "dealSource"],
     ops: {
       list: (client, params) => client.deals.list(params),
       get: (client, id) => client.deals.get(id),
@@ -76,6 +81,7 @@ const definitions: ResourceDefinition[] = [
     slug: "company",
     description: "An organization.",
     schema: COLLECTION_SCHEMA_CATALOG.companies,
+    enumKeys: ["companyIndustry", "companyRegion", "companySize"],
     ops: {
       list: (client, params) => client.companies.list(params),
       get: (client, id) => client.companies.get(id),
@@ -90,6 +96,7 @@ const definitions: ResourceDefinition[] = [
     slug: "pipeline",
     description:
       "Sales pipeline containing stages. get returns the lightweight stage list; use the get_pipeline_board action for the full kanban board with deals.",
+    enumKeys: ["pipelineStageType"],
     ops: {
       list: (client, params) => client.pipelines.list(params),
       get: (client, id) => client.pipelines.get(id),
@@ -159,6 +166,7 @@ const definitions: ResourceDefinition[] = [
     slug: "custom_field_definition",
     description:
       "Custom field definition for Deal, Contact, or Company. Filter the list by { entity }. Required before setting custom field values.",
+    enumKeys: ["customizableTypes"],
     ops: {
       list: (client, params) => client.customFieldDefinitions.list(params),
       create: (client, attrs) => client.customFieldDefinitions.create(attrs),
@@ -193,6 +201,18 @@ export function getResourceDefinition(slug: string): ResourceDefinition | undefi
 
 export function listResourceSlugs(): string[] {
   return [...resourceRegistry.keys()];
+}
+
+/** Enum catalogs relevant to a resource, or undefined when it has none. */
+export function resourceEnums(
+  def: ResourceDefinition,
+): Partial<Record<EnumKey, readonly string[]>> | undefined {
+  if (!def.enumKeys?.length) return undefined;
+  const enums: Partial<Record<EnumKey, readonly string[]>> = {};
+  for (const key of def.enumKeys) {
+    enums[key] = COLLECTION_SCHEMA_CATALOG.enums[key];
+  }
+  return enums;
 }
 
 export function supportedOperations(def: ResourceDefinition): ResourceOperation[] {
