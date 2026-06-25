@@ -30,6 +30,41 @@ function fail(err: unknown): string {
   return `Error: ${apiError(err)}`;
 }
 
+type JsonSchemaNode = Record<string, unknown>;
+
+interface OpenAiToolParameters {
+  type: "object";
+  properties: Record<string, JsonSchemaNode>;
+  required: string[];
+  additionalProperties: true;
+}
+
+/**
+ * Derives an OpenAI-compatible function-tool schema from a Zod object.
+ *
+ * Tools with open-ended dictionaries (filters, attributes, action params) cannot
+ * use the default strict path: OpenAI rejects the `propertyNames` keyword that
+ * Zod v4 emits for `z.record(...)`, and strict mode forbids dictionaries entirely
+ * (every object must declare `additionalProperties: false`). We emit a non-strict
+ * schema and strip `propertyNames`, leaving `additionalProperties` to type the
+ * dictionary values. The Zod schema is still used to validate input in `execute`.
+ */
+function openAiToolParameters(schema: z.ZodObject<z.ZodRawShape>): OpenAiToolParameters {
+  const json = z.toJSONSchema(schema, {
+    io: "input",
+    override: ({ jsonSchema }) => {
+      delete jsonSchema.propertyNames;
+    },
+  });
+  const properties = (json.properties ?? {}) as Record<string, JsonSchemaNode>;
+  return {
+    type: "object",
+    properties,
+    required: Object.keys(properties),
+    additionalProperties: true,
+  };
+}
+
 /** Top-level param key names for an action's Zod object schema (optional keys suffixed with "?"). */
 function paramKeys(schema: z.ZodTypeAny): string[] {
   if (schema instanceof z.ZodObject) {
@@ -103,33 +138,36 @@ const describeResource = tool({
   },
 });
 
+const queryResourcesParams = z.object({
+  resource: z.string().describe("Resource slug to list"),
+  filters: z
+    .record(z.string(), z.string())
+    .nullable()
+    .describe("Filter key/value pairs from describe_resource (e.g. { status: 'open' })"),
+  custom_fields: z
+    .record(z.string(), z.string())
+    .nullable()
+    .describe("Custom field filters keyed by definition ID"),
+  sort: z.string().nullable().describe("Sort field (per-resource allowlist)"),
+  direction: z.enum(["asc", "desc"]).nullable().describe("Sort direction"),
+  page: z.number().int().positive().nullable().describe("Page number"),
+  limit: z.number().int().positive().max(100).nullable().describe("Results per page (max 100)"),
+});
+
 const queryResources = tool({
   name: "query_resources",
   description:
     "List records of a resource with optional filters, sort, pagination, and custom field filters. Call describe_resource first to learn valid filter and sort keys. Keep limit small (<=10) unless more are needed.",
-  parameters: z.object({
-    resource: z.string().describe("Resource slug to list"),
-    filters: z
-      .record(z.string(), z.string())
-      .nullable()
-      .describe("Filter key/value pairs from describe_resource (e.g. { status: 'open' })"),
-    custom_fields: z
-      .record(z.string(), z.string())
-      .nullable()
-      .describe("Custom field filters keyed by definition ID"),
-    sort: z.string().nullable().describe("Sort field (per-resource allowlist)"),
-    direction: z.enum(["asc", "desc"]).nullable().describe("Sort direction"),
-    page: z.number().int().positive().nullable().describe("Page number"),
-    limit: z.number().int().positive().max(100).nullable().describe("Results per page (max 100)"),
-  }),
+  strict: false,
+  parameters: openAiToolParameters(queryResourcesParams),
   execute: async (input, runContext?: RunContext<AgentContext>): Promise<string> => {
-    const def = getResourceDefinition(input.resource);
-    if (!def?.ops.list) {
-      return `Error: resource '${input.resource}' does not support query. Call describe_resource for valid resources/operations.`;
-    }
     try {
-      const params = buildQuery(input);
-      return ok(await def.ops.list(clientFrom(runContext), params));
+      const params = queryResourcesParams.parse(input);
+      const def = getResourceDefinition(params.resource);
+      if (!def?.ops.list) {
+        return `Error: resource '${params.resource}' does not support query. Call describe_resource for valid resources/operations.`;
+      }
+      return ok(await def.ops.list(clientFrom(runContext), buildQuery(params)));
     } catch (err) {
       return fail(err);
     }
@@ -177,43 +215,51 @@ const getResource = tool({
   },
 });
 
+const createResourceParams = z.object({
+  resource: z.string().describe("Resource slug"),
+  attributes: z.record(z.string(), z.unknown()).describe("Field values for the new record"),
+});
+
 const createResource = tool({
   name: "create_resource",
   description:
     "Create a record of a resource. attributes is an object of field values; call describe_resource (and list custom_field_definition) first to learn required fields.",
-  parameters: z.object({
-    resource: z.string().describe("Resource slug"),
-    attributes: z.record(z.string(), z.unknown()).describe("Field values for the new record"),
-  }),
+  strict: false,
+  parameters: openAiToolParameters(createResourceParams),
   execute: async (input, runContext?: RunContext<AgentContext>): Promise<string> => {
-    const def = getResourceDefinition(input.resource);
-    if (!def?.ops.create) {
-      return `Error: resource '${input.resource}' does not support create.`;
-    }
     try {
-      return ok(await def.ops.create(clientFrom(runContext), input.attributes));
+      const { resource, attributes } = createResourceParams.parse(input);
+      const def = getResourceDefinition(resource);
+      if (!def?.ops.create) {
+        return `Error: resource '${resource}' does not support create.`;
+      }
+      return ok(await def.ops.create(clientFrom(runContext), attributes));
     } catch (err) {
       return fail(err);
     }
   },
 });
 
+const updateResourceParams = z.object({
+  resource: z.string().describe("Resource slug"),
+  id: z.number().int().positive().describe("Record ID"),
+  attributes: z.record(z.string(), z.unknown()).describe("Fields to update"),
+});
+
 const updateResource = tool({
   name: "update_resource",
   description:
     "Update a record of a resource by ID. attributes contains only the fields to change.",
-  parameters: z.object({
-    resource: z.string().describe("Resource slug"),
-    id: z.number().int().positive().describe("Record ID"),
-    attributes: z.record(z.string(), z.unknown()).describe("Fields to update"),
-  }),
+  strict: false,
+  parameters: openAiToolParameters(updateResourceParams),
   execute: async (input, runContext?: RunContext<AgentContext>): Promise<string> => {
-    const def = getResourceDefinition(input.resource);
-    if (!def?.ops.update) {
-      return `Error: resource '${input.resource}' does not support update.`;
-    }
     try {
-      return ok(await def.ops.update(clientFrom(runContext), input.id, input.attributes));
+      const { resource, id, attributes } = updateResourceParams.parse(input);
+      const def = getResourceDefinition(resource);
+      if (!def?.ops.update) {
+        return `Error: resource '${resource}' does not support update.`;
+      }
+      return ok(await def.ops.update(clientFrom(runContext), id, attributes));
     } catch (err) {
       return fail(err);
     }
@@ -259,23 +305,27 @@ const search = tool({
   },
 });
 
+const performActionParams = z.object({
+  action: z.string().describe("Action slug (see describe_resource)"),
+  params: z.record(z.string(), z.unknown()).nullable().describe("Parameters for the action"),
+});
+
 const performAction = tool({
   name: "perform_action",
   description:
     "Execute a specialized (non-CRUD) action by slug, such as move_deal, link_contact_company, bulk operations, comments, membership changes, reports, or global reads. Discover available actions and their params via describe_resource.",
-  parameters: z.object({
-    action: z.string().describe("Action slug (see describe_resource)"),
-    params: z.record(z.string(), z.unknown()).nullable().describe("Parameters for the action"),
-  }),
+  strict: false,
+  parameters: openAiToolParameters(performActionParams),
   execute: async (input, runContext?: RunContext<AgentContext>): Promise<string> => {
-    const action = getAction(input.action);
-    if (!action) {
-      return `Error: unknown action '${input.action}'. Available actions: ${listActions()
-        .map((a) => a.slug)
-        .join(", ")}`;
-    }
     try {
-      return ok(await action.execute(clientFrom(runContext), input.params ?? {}));
+      const { action: slug, params } = performActionParams.parse(input);
+      const action = getAction(slug);
+      if (!action) {
+        return `Error: unknown action '${slug}'. Available actions: ${listActions()
+          .map((a) => a.slug)
+          .join(", ")}`;
+      }
+      return ok(await action.execute(clientFrom(runContext), params ?? {}));
     } catch (err) {
       return fail(err);
     }
