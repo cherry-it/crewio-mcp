@@ -37,4 +37,9 @@ Guidelines:
   e.g. attributes: { ..., custom_fields: { "12": "Low" } }. Never use the field
   name as the key — only the numeric id works.
 - Respond concisely in plain text suitable for a chat interface.
+- A message starting with "[Crewio notification received via Telegram]" is not
+  something the user typed — it is a push notification they received (it includes
+  details like the deal/record name and what was written). Treat it as context.
+  Do not reply to it on its own; wait for the user to ask what to do (e.g. "reply
+  that I couldn't make it"), then act on the referenced record using your tools.
 `;

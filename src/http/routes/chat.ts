@@ -1,11 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import { runAgent } from "../../agent/agent.js";
-import { sessionStore } from "../../agent/session-store.js";
+import { sessionStore, TELEGRAM_NOTIFICATION_PREFIX } from "../../agent/session-store.js";
 import { extractAuth, replyUnauthorized } from "../auth.js";
 
 interface ChatBody {
   session_id?: unknown;
   message?: unknown;
+}
+
+interface ContextBody {
+  session_id?: unknown;
+  text?: unknown;
+  url?: unknown;
 }
 
 export async function chatRoutes(app: FastifyInstance): Promise<void> {
@@ -78,5 +84,42 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
 
     sessionStore.delete(session_id);
     return reply.code(200).send({ session_id, cleared: true });
+  });
+
+  /**
+   * POST /chat/context
+   *
+   * Headers: same auth as POST /chat.
+   * Body: { session_id: string, text: string, url?: string }
+   *
+   * Appends an incoming event (e.g. a Telegram push notification) to the
+   * session thread WITHOUT running the agent. This makes the agent aware of
+   * notifications the user received out-of-band, so a later message like
+   * "reply that I couldn't make it" has the notification in context.
+   *
+   * Returns immediately; no reply is generated.
+   */
+  app.post<{ Body: ContextBody }>("/chat/context", async (request, reply) => {
+    const authResult = extractAuth(request);
+    if (!authResult.ok) {
+      return replyUnauthorized(reply, authResult.message);
+    }
+
+    const { session_id, text, url } = request.body ?? {};
+
+    if (typeof session_id !== "string" || !session_id.trim()) {
+      return reply.code(422).send({ error: "UNPROCESSABLE", message: "session_id is required." });
+    }
+    if (typeof text !== "string" || !text.trim()) {
+      return reply.code(422).send({ error: "UNPROCESSABLE", message: "text is required." });
+    }
+
+    const link = typeof url === "string" && url.trim() ? `\n${url.trim()}` : "";
+    const content = `${TELEGRAM_NOTIFICATION_PREFIX}\n${text.trim()}${link}`;
+
+    const existingThread = sessionStore.get(session_id) ?? [];
+    sessionStore.set(session_id, [...existingThread, { role: "user" as const, content }]);
+
+    return reply.code(200).send({ session_id, stored: true });
   });
 }

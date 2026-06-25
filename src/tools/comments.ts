@@ -31,9 +31,20 @@ export function registerCommentTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
     "create_comment",
     {
-      description: "Post a comment on a deal, contact, or company.",
+      description:
+        "Post a comment on a deal, contact, or company. To @-mention a user/team/group, embed an " +
+        'HTML node in body: <span data-type="mention" data-mentionable-type="user|team|group" ' +
+        'data-id="<id>" data-label="<Name>">@<Name></span>. Use the member user_id (not the ' +
+        "membership id) for users. Plain '@Name' text is NOT a mention and notifies no one.",
       inputSchema: {
-        body: z.string().min(1).describe("Comment text"),
+        body: z
+          .string()
+          .min(1)
+          .describe(
+            "Comment text. May contain HTML. Mentions must be " +
+              '<span data-type="mention" data-mentionable-type="user|team|group" data-id="<id>" ' +
+              'data-label="<Name>">@<Name></span> nodes; plain @Name text does not notify anyone.',
+          ),
         commentable_type: commentableTypeSchema.describe("Entity type"),
         commentable_id: z.number().int().positive().describe("Entity ID"),
       },
@@ -50,10 +61,20 @@ export function registerCommentTools(server: McpServer, client: CrewioClient) {
   server.registerTool(
     "update_comment",
     {
-      description: "Update a comment body.",
+      description:
+        "Update a comment body. Same mention rules as create_comment: @-mentions must be HTML " +
+        '<span data-type="mention" data-mentionable-type="user|team|group" data-id="<id>" ' +
+        'data-label="<Name>">@<Name></span> nodes (user_id for users), not plain @Name text.',
       inputSchema: {
         id: z.number().int().positive().describe("Comment ID"),
-        body: z.string().min(1).describe("Updated comment text"),
+        body: z
+          .string()
+          .min(1)
+          .describe(
+            "Updated comment text. Mentions must be " +
+              '<span data-type="mention" data-mentionable-type="user|team|group" data-id="<id>" ' +
+              'data-label="<Name>">@<Name></span> nodes; plain @Name text does not notify anyone.',
+          ),
       },
     },
     async ({ id, body }) => {
