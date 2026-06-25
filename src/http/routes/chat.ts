@@ -46,10 +46,9 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
       sessionStore.set(session_id, newThread);
       return reply.code(200).send({ session_id, reply: finalOutput });
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       app.log.error({ session_id, err }, "agent run failed");
-      return reply
-        .code(500)
-        .send({ error: "AGENT_ERROR", message: "The agent failed to process your message." });
+      return reply.code(500).send({ error: "AGENT_ERROR", message });
     }
   });
 }
