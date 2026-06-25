@@ -3,7 +3,8 @@ export const COLLECTION_SCHEMA_CATALOG = {
   common: {
     pagination: { page: "positive integer", limit: "positive integer, max 100" },
     sort: { sort: "allowlisted field per resource", direction: "asc | desc" },
-    customFieldFilter: "custom_field[<definition_id>]=<value> (use list_custom_field_definitions)",
+    customFieldFilter:
+      "filter via the custom_fields param keyed by numeric definition id; discover ids by querying the custom_field_definition resource (filter by entity: Deal | Contact | Company)",
     archivedFilter: "active | archived | all (deals, contacts, companies)",
   },
   deals: {

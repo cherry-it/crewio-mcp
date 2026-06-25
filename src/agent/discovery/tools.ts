@@ -225,7 +225,7 @@ const createResourceParams = z.object({
 const createResource = tool({
   name: "create_resource",
   description:
-    "Create a record of a resource. attributes is an object of field values; call describe_resource (and list custom_field_definition) first to learn required fields.",
+    'Create a record of a resource. attributes is an object of field values. To set custom fields, nest a `custom_fields` object keyed by numeric definition id inside attributes (e.g. { custom_fields: { "12": "Low" } }); discover ids and required fields by querying the custom_field_definition resource filtered by entity (Deal | Contact | Company).',
   strict: false,
   parameters: openAiToolParameters(createResourceParams),
   execute: async (input, runContext?: RunContext<AgentContext>): Promise<string> => {
@@ -251,7 +251,7 @@ const updateResourceParams = z.object({
 const updateResource = tool({
   name: "update_resource",
   description:
-    "Update a record of a resource by ID. attributes contains only the fields to change.",
+    'Update a record of a resource by ID. attributes contains only the fields to change. To set custom fields, nest a `custom_fields` object keyed by numeric definition id inside attributes (e.g. { custom_fields: { "12": "Low" } }).',
   strict: false,
   parameters: openAiToolParameters(updateResourceParams),
   execute: async (input, runContext?: RunContext<AgentContext>): Promise<string> => {

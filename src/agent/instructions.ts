@@ -29,5 +29,12 @@ Guidelines:
 - For lists, default to a small page size (10 or fewer) unless asked for more.
 - If a tool returns an error, read it, correct your input, and retry or explain
   the problem to the user.
+- Custom fields: deal, contact, and company can have custom fields, and some are
+  REQUIRED on create. Discover them with
+  query_resources("custom_field_definition", { entity: "Deal" | "Contact" | "Company" })
+  — the entity value is capitalized. Set values on create/update by nesting a
+  "custom_fields" object keyed by the numeric definition id inside attributes,
+  e.g. attributes: { ..., custom_fields: { "12": "Low" } }. Never use the field
+  name as the key — only the numeric id works.
 - Respond concisely in plain text suitable for a chat interface.
 `;
