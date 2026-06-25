@@ -51,4 +51,28 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(500).send({ error: "AGENT_ERROR", message });
     }
   });
+
+  /**
+   * DELETE /chat
+   *
+   * Headers: same auth as POST /chat.
+   * Body: { session_id: string }
+   *
+   * Drops the in-memory conversation thread for the session so the next message
+   * starts fresh. Idempotent — clearing an unknown session is a no-op.
+   */
+  app.delete<{ Body: ChatBody }>("/chat", async (request, reply) => {
+    const authResult = extractAuth(request);
+    if (!authResult.ok) {
+      return replyUnauthorized(reply, authResult.message);
+    }
+
+    const { session_id } = request.body ?? {};
+    if (typeof session_id !== "string" || !session_id.trim()) {
+      return reply.code(422).send({ error: "UNPROCESSABLE", message: "session_id is required." });
+    }
+
+    sessionStore.delete(session_id);
+    return reply.code(200).send({ session_id, cleared: true });
+  });
 }
