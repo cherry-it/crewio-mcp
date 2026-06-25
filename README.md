@@ -1,6 +1,13 @@
-# crewio-mcp
+# crewio-agent
 
-Hosted HTTP [MCP](https://modelcontextprotocol.io) server that exposes your Crewio CRM as tools for AI assistants (Cursor, Claude Desktop, etc.).
+AI agent + hosted HTTP [MCP](https://modelcontextprotocol.io) server for Crewio CRM.
+
+Exposes two interfaces on a single Fastify process:
+
+- **`POST /chat`** — conversational AI agent (OpenAI Agents SDK) backed by the Crewio API
+- **`POST /mcp`** — Streamable HTTP MCP server for AI assistants (Cursor, Claude Desktop, etc.)
+
+Both use the same Crewio auth headers; the agent calls its own `/mcp` endpoint over loopback.
 
 ## Capabilities
 
@@ -12,9 +19,34 @@ Hosted HTTP [MCP](https://modelcontextprotocol.io) server that exposes your Crew
 - **Analytics**: deal reports, calendar, recycle bin
 - **Context**: `get_me`, `list_workspaces`
 
-List tools support **filters**, **sort** (`sort` + `direction`), **custom field filters**, and return **pagination metadata** from response headers (`currentPage`, `totalCount`, `totalPages`, `pageLimit`).
+## POST /chat
 
-## Response contract
+Conversational endpoint for the AI agent. Maintains in-memory conversation threads keyed by `session_id`.
+
+**Request headers:**
+
+- `Authorization: Bearer <crewio_api_token>`
+- `X-Workspace-Id: <workspace_id>`
+
+**Request body:**
+
+```json
+{ "session_id": "unique-session-id", "message": "List my open deals" }
+```
+
+**Response:**
+
+```json
+{ "session_id": "unique-session-id", "reply": "Here are your open deals…" }
+```
+
+Sessions expire after 1 hour of inactivity. The agent uses a curated subset of tools by default (read + core writes) to control token cost — set `AGENT_TOOLS=all` to expose all 94 tools.
+
+## POST /mcp (MCP server)
+
+Connects AI assistants directly to Crewio tools. Stateless — each request is authenticated independently.
+
+### Response contract
 
 All tool responses use a uniform envelope:
 
@@ -27,15 +59,11 @@ All tool responses use a uniform envelope:
 - Mutations that return `{ message, code }` wrap them as `{ "data": { message, code } }`
 - Raw arrays (e.g. `list_custom_field_definitions`) return `{ "data": [ ... ] }`
 
-## Future improvements
-
-See [docs/FUTURE.md](docs/FUTURE.md) for API capabilities not yet exposed as MCP tools.
-
 ## Setup
 
 ```bash
 cp .env.example .env
-# Edit .env and set CREWIO_API_URL
+# Edit .env: set CREWIO_API_URL and OPENAI_API_KEY at minimum
 npm install
 npm run dev
 ```
@@ -58,14 +86,12 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 }
 ```
 
-The server is **stateless** — each request is authenticated independently via the `Authorization` and `X-Workspace-Id` headers.
-
 ## Authentication
 
-Requests must include:
+All endpoints require:
 
-- `Authorization: Bearer <token>` — your Crewio API token
-- `X-Workspace-Id: <id>` — your workspace ID
+- `Authorization: Bearer <token>` — Crewio API token
+- `X-Workspace-Id: <id>` — workspace ID
 
 ## MCP resource
 
@@ -82,11 +108,37 @@ npm run format       # oxfmt
 npm run build        # Compile to dist/
 ```
 
+Smoke test the agent (requires a running server + real Crewio credentials):
+
+```bash
+CREWIO_TOKEN=<token> WORKSPACE_ID=<id> npx tsx tmp/smoke-chat.ts
+```
+
+## Environment variables
+
+| Variable          | Required | Default                     | Description                                   |
+| ----------------- | -------- | --------------------------- | --------------------------------------------- |
+| `CREWIO_API_URL`  | yes      | —                           | Crewio backend base URL                       |
+| `OPENAI_API_KEY`  | yes      | —                           | OpenAI API key (for `/chat`)                  |
+| `PORT`            | no       | `3002`                      | HTTP listen port                              |
+| `NODE_ENV`        | no       | `development`               | `development` \| `production` \| `test`       |
+| `AGENT_MODEL`     | no       | `gpt-4.1-mini`              | OpenAI model for the agent                    |
+| `AGENT_MAX_TURNS` | no       | `20`                        | Max turns per agent run                       |
+| `AGENT_TOOLS`     | no       | `curated`                   | `curated` (allowlist) or `all` (all 94 tools) |
+| `MCP_SELF_URL`    | no       | `http://127.0.0.1:3002/mcp` | Loopback URL for agent→MCP calls              |
+
 ## Docker
 
 ```bash
-docker build -t crewio-mcp .
-docker run -p 3002:3002 -e CREWIO_API_URL=http://host.docker.internal:3000 crewio-mcp
+docker build -t crewio-agent .
+docker run -p 3002:3002 \
+  -e CREWIO_API_URL=http://host.docker.internal:3000 \
+  -e OPENAI_API_KEY=sk-... \
+  crewio-agent
 ```
 
 Coolify: expose port **3002**. Runtime env: `CREWIO_API_URL=https://api.yourapp.com` (no trailing slash).
+
+## Future
+
+See [docs/FUTURE.md](docs/FUTURE.md) for API capabilities not yet exposed as MCP tools.

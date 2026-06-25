@@ -5,6 +5,11 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3002),
   // The base URL of the crewio backend this MCP server proxies to.
   CREWIO_API_URL: z.string().url(),
+
+  // OpenAI agent config
+  OPENAI_API_KEY: z.string().min(1),
+  AGENT_MODEL: z.string().default("gpt-4.1"),
+  AGENT_MAX_TURNS: z.coerce.number().int().positive().default(20),
 });
 
 function parseEnv() {

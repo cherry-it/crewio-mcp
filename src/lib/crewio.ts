@@ -8,6 +8,8 @@ import {
 export interface AuthContext {
   token: string;
   workspaceId: string;
+  /** Value sent as X-Source-Type to the Crewio API. Defaults to "mcp". */
+  sourceType?: string;
 }
 
 export interface PaginationMeta {
@@ -64,7 +66,7 @@ export function createCrewioClient(baseUrl: string, auth: AuthContext) {
         Accept: "application/json",
         Authorization: `Bearer ${auth.token}`,
         "X-Workspace-Id": auth.workspaceId,
-        "X-Source-Type": "mcp",
+        "X-Source-Type": auth.sourceType ?? "mcp",
         ...(options.headers as Record<string, string>),
       },
     });
