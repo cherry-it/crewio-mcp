@@ -65,7 +65,8 @@ const definitions: ResourceDefinition[] = [
   },
   {
     slug: "contact",
-    description: "A person. Can be linked to companies (see link_contact_company action).",
+    description:
+      "A person. create requires at least a first or last name; email is optional but must be unique within the workspace when provided. Can be linked to companies (see link_contact_company action).",
     schema: COLLECTION_SCHEMA_CATALOG.contacts,
     ops: {
       list: (client, params) => client.contacts.list(params),

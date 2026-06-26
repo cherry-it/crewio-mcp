@@ -90,7 +90,7 @@ export function registerContactTools(server: McpServer, client: CrewioClient) {
     "create_contact",
     {
       description:
-        "Create a new contact. Call list_custom_field_definitions first to check required custom fields for this workspace.",
+        "Create a new contact. Requires at least a first or last name; email is optional but must be unique within the workspace when provided. Call list_custom_field_definitions first to check required custom fields for this workspace.",
       inputSchema: {
         first_name: z.string().min(1).optional().describe("First name"),
         last_name: z.string().optional().describe("Last name"),
