@@ -375,6 +375,31 @@ const definitions: ActionDefinition[] = [
     execute: (client, p) => client.comments.restore(p.id),
   }),
 
+  // ─── Reactions ────────────────────────────────────────────────────────────────
+  defineAction({
+    slug: "create_reaction",
+    resource: "reaction",
+    description:
+      "Add an emoji reaction to a comment. Idempotent — repeating the same emoji " +
+      "returns the existing reaction instead of creating a duplicate.",
+    params: z.object({
+      comment_id: id,
+      emoji: z.string().min(1).describe("Emoji to react with (e.g. 👍, 🎉, 💪)"),
+    }),
+    execute: (client, p) => client.reactions.create(p.comment_id, p.emoji),
+  }),
+  defineAction({
+    slug: "remove_reaction",
+    resource: "reaction",
+    description:
+      "Remove your emoji reaction from a comment. Only the reaction author can remove it.",
+    params: z.object({
+      comment_id: id,
+      reaction_id: id,
+    }),
+    execute: (client, p) => client.reactions.destroy(p.comment_id, p.reaction_id),
+  }),
+
   // ─── Custom field definitions ──────────────────────────────────────────────────
   defineAction({
     slug: "create_custom_field_definition",

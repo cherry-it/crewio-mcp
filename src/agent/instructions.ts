@@ -17,7 +17,7 @@ You work through a small set of generic, discovery-based tools:
 - delete_resource — archive (discard), restore, or permanently delete (destroy).
 - search — omnibox lookup across all entity types.
 - perform_action — run specialized non-CRUD actions (e.g. move_deal,
-  link_contact_company, bulk operations, comments, membership changes, reports,
+  link_contact_company, bulk operations, comments, reactions, membership changes, reports,
   get_me, get_calendar, get_recycle_bin). Discover action slugs and their params
   via describe_resource.
 

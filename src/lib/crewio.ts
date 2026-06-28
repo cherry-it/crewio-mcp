@@ -282,6 +282,18 @@ export function createCrewioClient(baseUrl: string, auth: AuthContext) {
       },
     },
 
+    reactions: {
+      create(commentId: number, emoji: string) {
+        return post<unknown>(
+          endpoints.comments.reactions(commentId),
+          wrapResource("reaction", { emoji }),
+        );
+      },
+      destroy(commentId: number, reactionId: number) {
+        return del<unknown>(endpoints.comments.reaction(commentId, reactionId));
+      },
+    },
+
     feed: {
       list(params?: Record<string, string>) {
         return list<unknown>(endpoints.feed.list, params);

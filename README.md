@@ -13,7 +13,7 @@ Both use the same Crewio auth headers; the agent calls its own `/mcp` endpoint o
 
 - **CRM core**: deals, contacts, companies — full CRUD, archive/restore, bulk actions, custom fields
 - **Pipelines**: pipelines and stages CRUD, board view, deal creation via `POST /pipelines/:id/deals`
-- **Relationships**: contact ↔ company links, comments, activity feed
+- **Relationships**: contact ↔ company links, comments, reactions, activity feed
 - **Workspace**: members, teams, groups, invitations, notifications
 - **Discovery**: `list_custom_field_definitions`, omnibox `search`, MCP resource `crewio://schema/collection-filters`
 - **Analytics**: deal reports, calendar, recycle bin

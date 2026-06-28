@@ -118,6 +118,9 @@ export const endpoints = {
     destroy: (id: number) => `/api/v1/comments/${id}`,
     discard: (id: number) => `/api/v1/comments/${id}/discard`,
     restore: (id: number) => `/api/v1/comments/${id}/restore`,
+    reactions: (id: number) => `/api/v1/comments/${id}/reactions`,
+    reaction: (commentId: number, reactionId: number) =>
+      `/api/v1/comments/${commentId}/reactions/${reactionId}`,
   },
   calendar: "/api/v1/calendar",
   recycleBin: "/api/v1/recycle-bin",

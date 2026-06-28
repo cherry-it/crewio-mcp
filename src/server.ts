@@ -4,6 +4,7 @@ import { createCrewioClient, type AuthContext } from "./lib/crewio.js";
 import { COLLECTION_SCHEMA_CATALOG } from "./lib/schema-catalog.js";
 import { registerCompanyTools } from "./tools/companies.js";
 import { registerCommentTools } from "./tools/comments.js";
+import { registerReactionTools } from "./tools/reactions.js";
 import { registerContextTools, registerCustomFieldDefinitionTools } from "./tools/context.js";
 import { registerContactTools } from "./tools/contacts.js";
 import { registerDealTools } from "./tools/deals.js";
@@ -51,6 +52,7 @@ export function createMcpServer(auth: AuthContext): McpServer {
   registerContactTools(server, client);
   registerCompanyTools(server, client);
   registerCommentTools(server, client);
+  registerReactionTools(server, client);
   registerPipelineTools(server, client);
   registerTeamTools(server, client);
   registerGroupTools(server, client);
